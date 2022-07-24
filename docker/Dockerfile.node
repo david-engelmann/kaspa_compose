@@ -1,0 +1,9 @@
+FROM golang:1.18-alpine as build
+
+RUN apk add --no-cache curl git openssh binutils gcc musl-dev
+
+RUN git clone https://github.com/kaspanet/kaspad && \
+	cd kaspad && \
+	go install . ./cmd/...
+
+

@@ -1,0 +1,81 @@
+version: "3.8" # Docker Compose File Version
+
+networks:
+  kaspa_node:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/24
+          gateway: 172.18.0.1
+
+services:
+  kaspa_node:
+    # Set the name of the Container
+    container_name: "kaspa_node"
+    image: "kaspa_node"
+    hostname: www
+    domainname: kaspa_node.local
+    stdin_open: true
+    tty: true
+    networks:
+      kaspa_node:
+#        aliases:
+#          - "${KASPAD_ADDRESS:-kaspa_node}"
+        ipv4_address: "${KASPAD_ADDRESS:-172.18.0.2}"
+
+    labels:
+      maintainer: "david-engelmann"
+
+    user: root
+
+    ports:
+      - 18080:18080/tcp
+
+    env_file:
+      - ../docker/docker.env
+
+    command: /bin/sh -c "kaspad --utxoindex"
+
+    working_dir: /workspaces/kaspa
+
+    build:
+      context: "../"
+      dockerfile: "./docker/Dockerfile.node"
+    #healthcheck:
+      #test: "exit 0"
+      #interval: 30s  
+  kaspa_miner:
+    container_name: "kaspa_miner"
+    image: "kaspa_miner"
+    labels:
+      maintainer: "david-engelmann"
+    user: root
+    
+    env_file:
+      - ../docker/docker.env
+
+    command: /bin/sh -c "sleep 1000 && kaspa-miner --kaspad-address ${KASPAD_ADDRESS:-172.18.0.2} --mining-address ${WALLET_ADDRESS:-kaspa:qpwf7eda7q87hzlj9zx7keeh8maeln9h52d3ncmc67p848fvm6cdkqpm6kjv7}"
+
+    #command: /bin/sh -c "sleep 1000 && kaspa-miner --mining-address ${WALLET_ADDRESS:-kaspa:qpxs7xsl3w8xu0tgddsyugetd3rc27f4vdyx8lfh06c4lmllnu285djalutqq}"
+    #command: /bin/sh -c "sleep 1000 && container_ip=$$(docker inspect --format '{{ .NetworkSettings.IPAddress }}' kaspa_node) && kaspa-miner --kaspad-address $container_ip --mining-address ${WALLET_ADDRESS:-kaspa:qp33kyzexym032l6ujtgpagtxnfv8p35dyuqfay4ga0yca3vszmhyceq7kvq3}"
+    #command: /bin/sh -c "sleep 10 && container_ip=$$(docker inspect kaspa_node |python3 -c 'import json,sys;obj=json.load(sys.stdin);print(obj[0]["NetworkSettings"]["IPAddress"])') && echo $container_ip && kaspa-miner --kaspad-address $container_ip --mining-address ${WALLET_ADDRESS:-kaspa:qpxs7xsl3w8xu0tgddsyugetd3rc27f4vdyx8lfh06c4lmllnu285djalutqq}"
+    working_dir: /workspaces/kaspa
+
+    networks:
+      - kaspa_node
+#        ipv4_address: "${KASPAD_ADDRESS:-172.18.0.2}"
+    privileged: true
+
+    build:
+      context: "../"
+      dockerfile: "./docker/Dockerfile.miner"
+
+      args:
+        WALLET_ADDRESS: "${WALLET_ADDRESS:-kaspa:qpwf7eda7q87hzlj9zx7keeh8maeln9h52d3ncmc67p848fvm6cdkqpm6kjv7}"
+        KASPAD_ADDRESS: "${KASPAD_ADDRESS:-172.18.0.2}"
+    depends_on:
+      - "kaspa_node"
+    restart: unless-stopped 
+    ports:
+      - 37888:37888/tcp
